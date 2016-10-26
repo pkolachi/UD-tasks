@@ -1,0 +1,37 @@
+#!/bin/bash
+
+MALT_JAR="$HOME/Documents/softwares/nlp-tools/parsers/malt/maltparser-1.7.2/maltparser-1.7.2.jar"
+
+EXPDIR="$HOME/Documents/chalmers-work/gf-parsing/ud-parsing/v1.2"
+langcodes=( bg da de el en es et fi fr hi it sv )
+langnames=( Bulgarian Danish German Greek English Spanish Estonian Finnish French Hindi Italian Swedish )
+featfiles=( 
+
+)
+
+
+for ((idx=0; idx<${#langcodes[@]}; idx++));  do
+    echo "Checking files for ${langnames[$idx]}";
+
+    WRKDIR="$EXPDIR/${langcodes[$idx]}";
+    DATADIR="$WRKDIR/preprocessed-web-data";
+    MODELSDIR="$WRKDIR/full-models";
+    POSTAGSDIR="$WRKDIR/pos-tagger/mate-tools";
+
+    if [[ ! -d "$DATADIR" ]] ;  then
+	# directory with files was not found
+	echo "Data directory missing for ${langnames[$idx]}. Skipping ...";
+	continue;
+    fi
+
+    goldtrainfile="$DATADIR/${langcodes[$idx]}-ud-train.conll";
+    golddevfile="$DATADIR/${langcodes[$idx]}-ud-dev.conll";
+    goldtestfile="$DATADIR/${langcodes[$idx]}-ud-test.conll";
+
+    if [[ ! -f "$goldtrainfile" && -f "$golddevfile" && -f "$goldtestfile" ]] ;  then
+	echo "Gold files missing. Skipping ..."
+	continue;
+    fi
+
+
+done

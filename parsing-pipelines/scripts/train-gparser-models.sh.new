@@ -1,0 +1,120 @@
+#!/bin/bash
+
+MALT_JAR="$HOME/Documents/softwares/nlp-tools/parsers/malt/maltparser-1.7.2/maltparser-1.7.2.jar"
+EVAL_SCRIPT="$HOME/Documents/softwares/nlp-tools/parsers/mate-tools/eval09.pl"
+
+EXPDIR="$HOME/Documents/chalmers-work/gf-parsing/ud-parsing/v1.2"
+CORES=4
+langcodes=( bg da de el en es et fi fr hi it sv )
+langnames=( Bulgarian Danish German Greek English Spanish Estonian Finnish French Hindi Italian Swedish )
+
+function train_matemodels {
+    modelfile=$1;
+    trainfile=$2;
+    iters=10;
+    traincmd="java -Xmx15G -classpath $MATETOOLSJAR is2.parser.Parser \
+	-train $trainfile \
+	-model $modelfile \
+	-i $iters -hsize 500000001 -decodeTH 0.3 \
+	-cores $CORES";
+    echo "$traincmd" >&2;
+}
+
+function parse_matemodels {
+    modelfile=$1;
+    goldfile=$2;
+    testfile=$3;
+    outfile=$4;
+    parsecmd="java -Xmx15G -classpath $MATETOOLSJAR is2.parser.Parser \
+	-model $modelfile \
+	-test  $testfile \
+	-out   $outfile \
+	-eval  $goldfile \
+	-cores $CORES";
+    echo "$parsecmd" >&2;
+}
+
+function eval_parseroutput {
+    goldfile=$1;
+    sysoutfile=$2;
+    evaloutfile=$3;
+    evalcmd="perl $EVAL_SCRIPT -g $goldfile -s $sysoutfile -o $evaloutfile";
+    echo "$evalcmd" >&2;
+}
+
+
+
+for ((idx=0; idx<${#langcodes[@]}; idx++));  do
+    echo "Checking files for ${langnames[$idx]}";
+
+    WRKDIR="$EXPDIR/${langcodes[$idx]}";
+    DATADIR="$WRKDIR/preprocessed-web-data";
+    MODELSDIR="$WRKDIR/full-models";
+    POSTAGSDIR="$WRKDIR/pos-tagger/mate-tools";
+
+    if [[ ! -d "$DATADIR" ]] ;  then
+	# directory with files was not found
+	echo "Data directory missing for ${langnames[$idx]}. Skipping ...";
+	continue;
+    fi
+
+    #--------------------------------------------------------------------------
+    goldtrainfile="$DATADIR/${langcodes[$idx]}-ud-train.conll09";
+    golddevfile="$DATADIR/${langcodes[$idx]}-ud-dev.conll09";
+    goldtestfile="$DATADIR/${langcodes[$idx]}-ud-test.conll09";
+
+    if [[ ! -f "$goldtrainfile" && -f "$golddevfile" && -f "$goldtestfile" ]] ;  then
+	echo "Gold files missing. Skipping ..."
+	continue;
+    fi
+
+    echo "Training models on gold tagged data";
+
+    if [[ ! -d "$MODELSDIR/goldtags_model" ]] ; then
+	echo "Directory missing for model to be trained";
+	mkdir -p "$MODELSDIR/goldtags_model";
+    fi
+
+    mdlfile="$MODELSDIR/goldtags_model/${langcodes[$idx]}-ud-web.mdl";
+    devoutfile="$MODELSDIR/goldtags_model/${langcodes[$idx]}-ud-dev-gmateparsedth0_3.conll09";
+    devevalfile="$MODELSDIR/goldtags_model/${langcodes[$idx]}-ud-dev-gmateparsedth0_3.eval09";
+    testoutfile="$MODELSDIR/goldtags_model/${langcodes[$idx]}-ud-test-gmateparsedth0_3.conll09";
+    testevalfile="$MODELSDIR/goldtags_model/${langcodes[$idx]}-ud-test-gmateparsedth0_3.eval09";
+
+    train_matemodels $mdlfile $goldtrainfile;
+    parse_matemodels $mdfile  $golddevfile $devoutfile $golddevfile;
+    parse_matemodels $mdfile  $goldtestfile $testoutfile $goldtestfile;
+    eval_parseroutput $golddevfile $devoutfile  $devevalfile;
+    eval_parseroutput $goldtestfile $testoutfile  $testevalfile;
+
+    #--------------------------------------------------------------------------
+    taggedtrainfile="$DATADIR/${langcodes[$idx]}-ud-train-matetagged.conll09";
+    taggeddevfile="$POSTAGSDIR/${langcodes[$idx]}-ud-dev-udweb_tagged.conll09";
+    taggedtestfile="$POSTAGSDIR/${langcodes[$idx]}-ud-test-udweb_tagged.conll09";
+    
+    if [[ ! -f "$taggedtrainfile" && -f "$taggeddevfile" && -f "$taggedtestfile" ]] ;  then
+	echo "Tagger output files missing ($taggedtrainfile, $taggeddevfile, $taggedtestfile). Skipping ..."
+	continue;
+    fi
+
+    echo "Training models on auto-pos tagged data";
+
+    if [[ ! -d "$MODELSDIR/web_model" ]] ; then
+	echo "Directory missing for model to be trained";
+	mkdir -p "$MODELSDIR/web_model";
+    fi
+
+    mdlfile="$MODELSDIR/web_model/${langcodes[$idx]}-ud-web.mdl";
+    devoutfile="$MODELSDIR/web_model/${langcodes[$idx]}-ud-dev-gmateparsedth0_3.conll09";
+    devevalfile="$MODELSDIR/web_model/${langcodes[$idx]}-ud-dev-gmateparsedth0_3.eval09";
+    testoutfile="$MODELSDIR/web_model/${langcodes[$idx]}-ud-test-gmateparsedth0_3.conll09";
+    testevalfile="$MODELSDIR/web_model/${langcodes[$idx]}-ud-test-gmateparsedth0_3.eval09";
+
+    train_matemodels $mdlfile $taggedtrainfile;
+    parse_matemodels $mdfile  $taggeddevfile $devoutfile $golddevfile;
+    parse_matemodels $mdfile  $taggedtestfile $testoutfile $goldtestfile;
+    eval_parseroutput $golddevfile $devoutfile  $devevalfile;
+    eval_parseroutput $goldtestfile $testoutfile  $testevalfile;
+
+
+done
