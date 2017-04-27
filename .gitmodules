@@ -1,0 +1,3 @@
+[submodule "UD-parsing"]
+	path = UD-parsing
+	url = https://github.com/pkolachi/UD-parsing.git
